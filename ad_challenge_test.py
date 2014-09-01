@@ -51,7 +51,7 @@ sgd = algorithms.StochasticGradientDescentMethod(train_labels,train_features)
 sgd.learn(10,True)
 
 result = sgd.predict(test_id,test_features)
-print result[:10,:]
+print result[:20,:]
 
 
 
