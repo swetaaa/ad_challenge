@@ -4,7 +4,7 @@ import scipy.stats as stats
 
 import algorithms # our own implementation of the algorithms
 
-path = '/Users/Sweta/Documents/Kaggle/Advertising_Challenge/'
+path = './'
 
 def convertfunc(value):
     if value != np.nan:
