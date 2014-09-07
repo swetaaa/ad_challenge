@@ -14,7 +14,7 @@ testfilename = testpath+'test.csv'
 
 resultfilename = testpath+'result.csv'
 
-batch_length = 100000
+batch_length = 200000
 
 # fill 'nan': use the mean of the column
 def fillna_with_mean(mat):   
@@ -31,9 +31,15 @@ def file_len(fname):
         for i, l in enumerate(f):
             pass
     return i + 1
-
+            
 #filter to just use a portion of the file for calculations
-def filter_lines(f, start_val, end_val):
+def filter_training_lines(f, jump):
+    for i, line in enumerate(f):
+        if i > 0 and i % jump == 0:
+            yield line
+            
+#filter to just use a portion of the file for calculations
+def filter_prediction_lines(f, start_val, end_val):
     for i, line in enumerate(f):
         if i >= start_val and i <= end_val:
             yield line
@@ -50,37 +56,27 @@ conv = {col: convertfunc for col in range(1,41)}
 
 #determine the training set file length
 file_length = file_len(filename)
+file_length = batch_length + 1
+print('Length of training set: '+str(file_length))
 
 # initialize stochastic gradient descent class (home made)
 sgd = algorithms.StochasticGradientDescentMethod()
-
+#sgd.setTrainSize(file_length)
 '''
 Train with stochastic gradient descent
-'''
-start=1
-end=0
+'''   
+with open(filename) as f:
+    train_data = np.genfromtxt(filter_training_lines(f, 100),delimiter=',',skip_header=0,dtype=float,converters=conv)
 
-while end < file_length:
-    end += batch_length
-    if start == 1:
-        initialize = True
-    else:
-        initialize = False
-        
-    with open(filename) as f:
-        train_data = np.genfromtxt(filter_lines(f, start, end),delimiter=',',skip_header=0,dtype=float,converters=conv)
+# fill 'Nan' values with the mean of the corresponding column
+fillna_with_mean(train_data[:,2:])
+# define training labels and features
+train_labels   = train_data[:,1]
+train_features = train_data[:,2:]
 
-    #train_data = np.genfromtxt(path+'train_head.csv',delimiter=',',skip_header=1,dtype=float,converters=conv)
-    # fill 'Nan' values with the mean of the corresponding column
-    fillna_with_mean(train_data[:,2:])
-    # define training labels and features
-    train_labels   = train_data[:,1]
-    train_features = train_data[:,2:]
-
-    sgd.setTrainData(train_labels,train_features,initialize)
-    sgd.learn(1,True)
-    print ('Start: '+str(start)+'\nEnd: '+str(end))
-    start += batch_length
+sgd.setTrainData(train_labels,train_features,True)
+sgd.learn(100,True,eta=0.01,theta=0.000001)
+print ('SGD Learning Ready')
 
 
 '''
@@ -101,10 +97,11 @@ with open(resultfilename, "w") as text_file:
 while end < test_file_length:
     end += batch_length
     with open(testfilename) as f:
-        test_data = np.genfromtxt(filter_lines(f, start, end),delimiter=',',skip_header=0,dtype=float,converters=conv)   
+        test_data = np.genfromtxt(filter_prediction_lines(f, start, end),delimiter=',',skip_header=0,dtype=float,converters=conv)   
     
     # fill 'Nan' values with the mean of the corresponding column  
     fillna_with_mean(test_data[:,1:])
+    
     # define test id and features
     test_id = test_data[:,0]
     test_id = test_id.astype(int)
@@ -113,16 +110,11 @@ while end < test_file_length:
     #Calculate the prediction    
     result = sgd.predict(test_id,test_features)
     res = np.rec.fromarrays((result[:,0].astype(int), result[:,1].astype(float)))
-    #result[:,1] = result[:,1].astype('float32')
+
     with open(resultfilename, 'a') as f_handle:      
         for item in res:
             f_handle.write(str(item[0][0])+','+str(item[0][1])+'\n')  
     
-    '''
-    #Write predictions to result file
-    with open(resultfilename,'a') as f_handle:
-        np.savetxt(f_handle, res, delimiter=",")
-    '''
     print ('Start: '+str(start)+'\nEnd: '+str(end))
     start += batch_length
 

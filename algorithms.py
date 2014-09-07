@@ -16,7 +16,8 @@ class StochasticGradientDescentMethod():
         self.weights_vec = np.zeros(self.feature_mat.shape[1])
         self.scaling_vec = np.linalg.norm(self.feature_mat,np.inf,axis=0)
         self.feature_mat = self.scale(self.feature_mat)
-        self.iter = 0
+        self.iter = 1
+        self.train_size = self.label_vec.shape[0]
         
     def setTrainData(self,train_labels,train_features,init=False):
         self.label_vec = train_labels
@@ -24,11 +25,16 @@ class StochasticGradientDescentMethod():
         if init:
             self.weights_vec = np.zeros(self.feature_mat.shape[1])
             self.scaling_vec = np.linalg.norm(self.feature_mat,np.inf,axis=0)
+            if self.train_size == 1:
+                self.train_size = self.label_vec.shape[0]
         self.feature_mat = self.scale(self.feature_mat)
         
-    def scale(self,mat):         
-         scaled_mat = (mat.T/self.scaling_vec[:,None]).T
-         return scaled_mat
+    def setTrainSize(self,train_size):
+        self.train_size = train_size
+        
+    def scale(self,mat):
+        scaled_mat = (mat.T/self.scaling_vec[:,None]).T
+        return scaled_mat
          
     def logLossError(self, act, pred):
         epsilon = 1e-15
@@ -49,7 +55,7 @@ class StochasticGradientDescentMethod():
         l1 = 1 + l2 # outer derivative of log
         return ( (-1.0) * l2 * y * x) / l1
         
-    def learn(self,no_iter,shuffle, eta=0.001, theta=0.000001):
+    def learn(self,no_iter,shuffle, eta=0.001, theta=0.00001):
         '''
         note: logistic loss function is used by default
         no_iter : how many times the algorithm is applied to the training set
@@ -57,11 +63,20 @@ class StochasticGradientDescentMethod():
         '''            
         #eta   = 0.001  # learning rate
         #theta = 0.7    # regularization parameter
-
+        new_error=1
         for it in range(0,no_iter):
             res=self.feature_mat.dot(self.weights_vec)
+            old_error = new_error
+            new_error=self.logLossError(self.label_vec,res)
+            delta_error = np.fabs(old_error - new_error)
             print('iteration : '+str(it))
-            print('Error with latest weights:'+str(self.logLossError(self.label_vec,res)))
+            print('Error with latest weights:'+str(new_error))
+            print('Error delta with last error:'+str(delta_error))
+
+            #convergence criteria            
+            if delta_error < 0.01*eta:
+                break
+            
             if shuffle == True:
                 combi_mat =  np.append(self.label_vec[:,None],self.feature_mat,1)
                 np.random.shuffle( combi_mat )
@@ -69,12 +84,12 @@ class StochasticGradientDescentMethod():
                 self.label_vec   = combi_mat[:,0]
             # run SGD for every sample
             for ind, row in enumerate(self.feature_mat):
-                self.iter += 1
                 p = np.inner(self.weights_vec,row) # compute probability
-                alpha = (1/(float(self.label_vec.shape[0]*(1+eta*theta*self.iter))))*eta
+                alpha = eta / ( float(self.label_vec.shape[0]) * (1.0+eta*theta*self.iter) )
                 self.weights_vec -= alpha * theta*self.weights_vec #l2 Regularization
                 self.weights_vec -= alpha * self.logistic_loss_function_gradient(row,self.label_vec[ind],p)
-                
+            
+            self.iter += 1
         return self.weights_vec
         
         
